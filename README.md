@@ -1,6 +1,8 @@
 # flutter_firebase
 
-A new Flutter project.
+Flutter で Firebase Authentication を利用するテストアプリです.
+
+詳細は、[TECHaas - Flutter から Firebase を使う](https://www.techaas.net/post/flutter-firebase/)で説明しています。
 
 ## Getting Started
 

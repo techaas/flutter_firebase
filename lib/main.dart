@@ -1,6 +1,18 @@
+// Copyright 2021, Techaas.com. All rights reserved.
+//
 import 'package:flutter/material.dart';
 
-void main() {
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter_signin_button/flutter_signin_button.dart';
+import 'package:http/http.dart' as http;
+
+// JWTトークンのアクセス検証サーバに変更してください
+final url = Uri.parse('https://xxxxxx.appspot.com/');
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
   runApp(MyApp());
 }
 
@@ -11,103 +23,224 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Flutter Demo',
       theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // Try running your application with "flutter run". You'll see the
-        // application has a blue toolbar. Then, without quitting the app, try
-        // changing the primarySwatch below to Colors.green and then invoke
-        // "hot reload" (press "r" in the console where you ran "flutter run",
-        // or simply save your changes to "hot reload" in a Flutter IDE).
-        // Notice that the counter didn't reset back to zero; the application
-        // is not restarted.
         primarySwatch: Colors.blue,
       ),
-      home: MyHomePage(title: 'Flutter Demo Home Page'),
+      home: SignInOutPage(title: 'Firebase Authentication'),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  MyHomePage({Key? key, required this.title}) : super(key: key);
+final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
+class SignInOutPage extends StatefulWidget {
+  SignInOutPage({Key? key, required this.title}) : super(key: key);
   final String title;
 
   @override
-  _MyHomePageState createState() => _MyHomePageState();
+  _SignInOutPageState createState() => _SignInOutPageState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+class _SignInOutPageState extends State<SignInOutPage> {
+  User? user;
 
-  void _incrementCounter() {
-    setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
+  @override
+  void initState() {
+    _auth.userChanges().listen((event) {
+      debugPrint('user: $event');
+      setState(() => user = event);
     });
+    super.initState();
   }
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
     return Scaffold(
       appBar: AppBar(
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
         title: Text(widget.title),
       ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Invoke "debug painting" (press "p" in the console, choose the
-          // "Toggle Debug Paint" action from the Flutter Inspector in Android
-          // Studio, or the "Toggle Debug Paint" command in Visual Studio Code)
-          // to see the wireframe for each widget.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            Text(
-              'You have pushed the button this many times:',
-            ),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headline4,
-            ),
-          ],
-        ),
+      body: Container(
+        margin: EdgeInsets.only(top: 100),
+        alignment: Alignment.center,
+        child: (user == null) ? _EmailPasswordForm() : _UserInfoCard(user),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: Icon(Icons.add),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
     );
+  }
+}
+
+class _EmailPasswordForm extends StatefulWidget {
+  @override
+  State<StatefulWidget> createState() => _EmailPasswordFormState();
+}
+
+class _EmailPasswordFormState extends State<_EmailPasswordForm> {
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+
+  @override
+  Widget build(BuildContext context) {
+    return Form(
+        key: _formKey,
+        child: Card(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Container(
+                  alignment: Alignment.center,
+                  child: const Text(
+                    'ユーザー名とパスワードを入力してください',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                TextFormField(
+                  controller: _emailController,
+                  decoration: const InputDecoration(labelText: 'Email'),
+                  validator: (String? value) {
+                    if (value != null && value.isEmpty) return 'テキストを入力してください';
+                    return null;
+                  },
+                ),
+                TextFormField(
+                  controller: _passwordController,
+                  decoration: const InputDecoration(labelText: 'Password'),
+                  validator: (String? value) {
+                    if (value != null && value.isEmpty) return 'テキストを入力してください';
+                    return null;
+                  },
+                  obscureText: true,
+                ),
+                Container(
+                  padding: const EdgeInsets.only(top: 16),
+                  alignment: Alignment.center,
+                  child: SignInButton(
+                    Buttons.Email,
+                    text: 'ログイン',
+                    onPressed: () async {
+                      if (_formKey.currentState!.validate()) {
+                        await _signInWithEmailAndPassword();
+                      }
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ));
+  }
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _signInWithEmailAndPassword() async {
+    try {
+      final User? user = (await _auth.signInWithEmailAndPassword(
+        email: _emailController.text,
+        password: _passwordController.text,
+      ))
+          .user;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${user?.email} でログインしました'),
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('ユーザー名かパスワードが違います'),
+        ),
+      );
+    }
+  }
+}
+
+class _UserInfoCard extends StatefulWidget {
+  final User? user;
+
+  const _UserInfoCard(this.user);
+
+  @override
+  _UserInfoCardState createState() => _UserInfoCardState();
+}
+
+class _UserInfoCardState extends State<_UserInfoCard> {
+  @override
+  Widget build(BuildContext context) {
+    return Column(crossAxisAlignment: CrossAxisAlignment.center, children: <Widget>[
+      Text((widget.user == null)
+          ? 'Not signed in'
+          : '${widget.user!.isAnonymous ? '匿名ユーザ\n\n' : ''}'
+              'Email: ${widget.user!.email} (verified: ${widget.user!.emailVerified})\n\n'),
+      SizedBox(
+        width: 150,
+        child: ElevatedButton(
+            child: const Text('Check Token'),
+            style: ElevatedButton.styleFrom(
+              primary: Colors.green,
+            ),
+            onPressed: () async {
+              await _checkToken();
+            }),
+      ),
+      SizedBox(height: 20),
+      SizedBox(
+        width: 150,
+        child: ElevatedButton(
+            child: const Text('Logout'),
+            onPressed: () async {
+              await _signOut();
+            }),
+      ),
+    ]);
+  }
+
+  Future<void> _signOut() async {
+    await _auth.signOut();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('ログアウトしました'),
+      ),
+    );
+  }
+
+  Future<void> _checkToken() async {
+    String? token = await widget.user?.getIdToken();
+
+    if (token == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('トークンが取得できませんでした'),
+        ),
+      );
+      return;
+    }
+    debugPrint('token: $token');
+
+    var response = await http.get(url, headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'Authorization': 'Bearer $token',
+    });
+    print('Response status: ${response.statusCode}');
+    // print('Response body: ${response.body}');
+    if (response.statusCode == 200) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('トークンが正しく検証されました'),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('検証に失敗しました'),
+        ),
+      );
+    }
   }
 }
